@@ -18,7 +18,7 @@ def get_parser_for_file(filepath):
 
 # --- [타겟 선정] ---
 # 실제 소스 코드(Source Code)만을 대상으로 함 (테스트, 인덱스, 데모 제외)
-search_dir = BASE_DIR / "base-ui"
+search_dir = BASE_DIR / "base-ui" / "packages" / "react" / "src"
 all_files = list(search_dir.rglob("*.tsx"))
 
 target_file = None
@@ -31,7 +31,8 @@ if not target_file:
     print("[Warning] 적합한 소스 파일을 찾지 못하여 대체 파일을 사용합니다.")
     target_file = all_files[0]
 
-print(f"[Target] 최종 알고리즘 적용 대상: {target_file.name}")
+print(f"[Target] 최종 알고리즘 적용 대상 경로: {target_file}")
+print(f"[Target] 최종 알고리즘 적용 대상 이름: {target_file.name}")
 print("-" * 70)
 
 # --- [파싱] ---

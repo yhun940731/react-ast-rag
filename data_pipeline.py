@@ -117,7 +117,7 @@ def run_pipeline():
     print("[Process] 데이터셋 구축 파이프라인(Dataset Pipeline) 가동 시작...")
     
     # 전체 파일 탐색 (재귀적)
-    search_dir = BASE_DIR / "base-ui"
+    search_dir = BASE_DIR / "base-ui" / "packages" / "react" / "src"
     raw_files = list(search_dir.rglob("*.tsx"))
     
     # 노이즈 필터링: 테스트 코드, 의존성 모듈 제외

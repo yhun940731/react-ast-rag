@@ -34,7 +34,8 @@ for f in found_files:
 if not target_file:
     target_file = found_files[0]
 
-print(f"[Target] 분석 대상 파일: {target_file.name}")
+print(f"[Target] 분석 대상 파일 경로: {target_file}")
+print(f"[Target] 분석 대상 파일 이름: {target_file.name}")
 print(f"         (경로: {target_file})")
 
 # --- [AST 파싱] ---

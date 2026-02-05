@@ -30,7 +30,8 @@ for f in all_files:
 if not target_file and all_files:
     target_file = all_files[0]
 
-print(f"[Target] 정밀 분석 대상: {target_file.name}")
+print(f"[Target] 정밀 분석 대상 경로: {target_file}")
+print(f"[Target] 정밀 분석 대상 이름: {target_file.name}")
 
 # --- [파싱] ---
 with target_file.open("r", encoding="utf-8") as f:
