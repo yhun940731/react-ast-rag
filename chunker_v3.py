@@ -1,26 +1,29 @@
-import os
-import glob
 import json
+from pathlib import Path
 from tree_sitter import Language, Parser
+import tree_sitter_typescript as tst
 
 # --- [설정] ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TS_GRAMMAR_PATH = os.path.join(BASE_DIR, "vendor", "tree-sitter-typescript", "tsx")
-BUILD_DIR = os.path.join(BASE_DIR, "build")
-LIB_FILE = os.path.join(BUILD_DIR, "my-languages.so")
+BASE_DIR = Path(__file__).resolve().parent
+TS_LANGUAGE = Language(tst.language_typescript())
+TSX_LANGUAGE = Language(tst.language_tsx())
 
-TSX_LANGUAGE = Language(LIB_FILE, 'tsx')
-parser = Parser()
-parser.set_language(TSX_LANGUAGE)
+def get_parser_for_file(filepath):
+    parser = Parser()
+    if str(filepath).endswith(".tsx"):
+        parser.language = TSX_LANGUAGE
+    else:
+        parser.language = TS_LANGUAGE
+    return parser
 
 # --- [타겟 선정] ---
 # 실제 소스 코드(Source Code)만을 대상으로 함 (테스트, 인덱스, 데모 제외)
-search_pattern = os.path.join(BASE_DIR, "base-ui", "**", "*.tsx")
-all_files = glob.glob(search_pattern, recursive=True)
+search_dir = BASE_DIR / "base-ui"
+all_files = list(search_dir.rglob("*.tsx"))
 
 target_file = None
 for f in all_files:
-    if not any(x in f for x in [".spec.", ".test.", "index.", "demo"]):
+    if not any(x in str(f) for x in [".spec.", ".test.", "index.", "demo"]):
         target_file = f
         break
 
@@ -28,20 +31,22 @@ if not target_file:
     print("[Warning] 적합한 소스 파일을 찾지 못하여 대체 파일을 사용합니다.")
     target_file = all_files[0]
 
-print(f"[Target] 최종 알고리즘 적용 대상: {os.path.basename(target_file)}")
+print(f"[Target] 최종 알고리즘 적용 대상: {target_file.name}")
 print("-" * 70)
 
 # --- [파싱] ---
-with open(target_file, "r", encoding="utf-8") as f:
+with target_file.open("r", encoding="utf-8") as f:
     code_text = f.read()
 lines = code_text.split('\n')
-tree = parser.parse(bytes(code_text, "utf8"))
+code_bytes = bytes(code_text, "utf8")
+parser = get_parser_for_file(target_file)
+tree = parser.parse(code_bytes)
 
 # --- [제안 알고리즘: AST-based Chunking with Metadata] ---
 chunks = []
 
 def get_text(node):
-    return code_text[node.start_byte : node.end_byte]
+    return code_bytes[node.start_byte : node.end_byte].decode("utf8")
 
 def traverse_component(node, parent_name):
     """

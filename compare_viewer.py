@@ -1,18 +1,18 @@
-import os
 import json
 import random
+from pathlib import Path
 
 # --- [설정] 파일 경로 설정 ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "dataset")
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "dataset"
 
 def load_data():
     """구축된 데이터셋(JSON)을 메모리로 로드합니다."""
     # 1. Baseline 데이터 로드
-    with open(os.path.join(DATA_DIR, "dataset_baseline.json"), "r", encoding="utf-8") as f:
+    with (DATA_DIR / "dataset_baseline.json").open("r", encoding="utf-8") as f:
         baseline = json.load(f)
     # 2. 제안 방법(Ours) 데이터 로드
-    with open(os.path.join(DATA_DIR, "dataset_ours.json"), "r", encoding="utf-8") as f:
+    with (DATA_DIR / "dataset_ours.json").open("r", encoding="utf-8") as f:
         ours = json.load(f)
     return baseline, ours
 

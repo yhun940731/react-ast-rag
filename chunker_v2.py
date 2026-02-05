@@ -1,39 +1,44 @@
-import os
-import glob
+from pathlib import Path
 from tree_sitter import Language, Parser
+import tree_sitter_typescript as tst
 
 # --- [설정] ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TS_GRAMMAR_PATH = os.path.join(BASE_DIR, "vendor", "tree-sitter-typescript", "tsx")
-BUILD_DIR = os.path.join(BASE_DIR, "build")
-LIB_FILE = os.path.join(BUILD_DIR, "my-languages.so")
+BASE_DIR = Path(__file__).resolve().parent
+TS_LANGUAGE = Language(tst.language_typescript())
+TSX_LANGUAGE = Language(tst.language_tsx())
 
-TSX_LANGUAGE = Language(LIB_FILE, 'tsx')
-parser = Parser()
-parser.set_language(TSX_LANGUAGE)
+def get_parser_for_file(filepath):
+    parser = Parser()
+    if str(filepath).endswith(".tsx"):
+        parser.language = TSX_LANGUAGE
+    else:
+        parser.language = TS_LANGUAGE
+    return parser
 
 # --- [타겟 선정] 복잡도가 높은 파일 탐색 ---
 # Hook 사용 빈도가 높은 파일(예: 'use' 접두사 파일)을 우선 선정하여 분할 성능 테스트
-search_pattern = os.path.join(BASE_DIR, "base-ui", "**", "*.tsx")
-all_files = glob.glob(search_pattern, recursive=True)
+search_dir = BASE_DIR / "base-ui" / "packages" / "react" / "src"
+all_files = list(search_dir.rglob("*.tsx"))
 
 target_file = None
 # 1순위: 'use' 키워드가 포함된 파일 (Hook 로직 검증용)
 for f in all_files:
-    if "use" in os.path.basename(f) and "test" not in f:
+    if "use" in f.name and "test" not in str(f):
         target_file = f
         break
 
 if not target_file and all_files:
     target_file = all_files[0]
 
-print(f"[Target] 정밀 분석 대상: {os.path.basename(target_file)}")
+print(f"[Target] 정밀 분석 대상: {target_file.name}")
 
 # --- [파싱] ---
-with open(target_file, "r", encoding="utf-8") as f:
+with target_file.open("r", encoding="utf-8") as f:
     code_text = f.read()
 lines = code_text.split('\n')
-tree = parser.parse(bytes(code_text, "utf8"))
+code_bytes = bytes(code_text, "utf8")
+parser = get_parser_for_file(target_file)
+tree = parser.parse(code_bytes)
 
 # --- [분석 로직] 컴포넌트 내부 구조(Internal Structure) 식별 ---
 print("\n[Deep Analysis] 컴포넌트 내부의 논리(Logic) 및 뷰(View) 영역 식별")
@@ -51,7 +56,7 @@ def traverse(node, depth=0):
     if node.type == "call_expression":
         func_name_node = node.child_by_field_name("function")
         if func_name_node:
-            func_name = code_text[func_name_node.start_byte : func_name_node.end_byte]
+            func_name = code_bytes[func_name_node.start_byte : func_name_node.end_byte].decode("utf8")
             if func_name.startswith("use"):
                 print(f"{'  ' * depth}⚡ [Logic] Hook 호출 식별: {func_name} (Line {node.start_point[0]+1})")
                 return # Hook 내부는 단일 청크로 간주하여 하위 탐색 중단

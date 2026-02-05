@@ -1,17 +1,20 @@
-import os
-import glob
 import json
+from pathlib import Path
 from tree_sitter import Language, Parser
+import tree_sitter_typescript as tst
 
 # --- [설정] ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TS_GRAMMAR_PATH = os.path.join(BASE_DIR, "vendor", "tree-sitter-typescript", "tsx")
-BUILD_DIR = os.path.join(BASE_DIR, "build")
-LIB_FILE = os.path.join(BUILD_DIR, "my-languages.so")
+BASE_DIR = Path(__file__).resolve().parent
+TS_LANGUAGE = Language(tst.language_typescript())
+TSX_LANGUAGE = Language(tst.language_tsx())
 
-TSX_LANGUAGE = Language(LIB_FILE, 'tsx')
-parser = Parser()
-parser.set_language(TSX_LANGUAGE)
+def get_parser_for_file(filepath):
+    parser = Parser()
+    if str(filepath).endswith(".tsx"):
+        parser.language = TSX_LANGUAGE
+    else:
+        parser.language = TS_LANGUAGE
+    return parser
 
 # --- [Baseline Algorithm] 고정 크기 청킹 (Fixed-size Chunking) ---
 def chunk_baseline(code, chunk_size=500, overlap=50):
@@ -37,9 +40,10 @@ def chunk_ours(tree, code):
     AST를 순회하며 코드의 기능적 단위(Hook, JSX)를 추출하고 구조적 메타데이터를 부여합니다.
     """
     chunks = []
+    code_bytes = bytes(code, "utf8")
     
     def get_text(node):
-        return code[node.start_byte : node.end_byte]
+        return code_bytes[node.start_byte : node.end_byte].decode("utf8")
 
     def traverse(node, parent_name):
         # 1. Hook 추출
@@ -113,22 +117,23 @@ def run_pipeline():
     print("[Process] 데이터셋 구축 파이프라인(Dataset Pipeline) 가동 시작...")
     
     # 전체 파일 탐색 (재귀적)
-    search_pattern = os.path.join(BASE_DIR, "base-ui", "**", "*.tsx")
-    raw_files = glob.glob(search_pattern, recursive=True)
+    search_dir = BASE_DIR / "base-ui"
+    raw_files = list(search_dir.rglob("*.tsx"))
     
     # 노이즈 필터링: 테스트 코드, 의존성 모듈 제외
     target_files = []
     for f in raw_files:
-        if "node_modules" in f: continue
-        if ".test." in f or ".spec." in f: continue
+        f_str = str(f)
+        if "node_modules" in f_str: continue
+        if ".test." in f_str or ".spec." in f_str: continue
         # 필요 시 예제 코드(docs) 포함/제외 결정
-        if "docs" in f: continue 
+        if "docs" in f_str: continue 
         target_files.append(f)
 
     # 타겟 파일 부족 시 예외 처리 (실험용 데이터 확보를 위해 범위 확장)
     if len(target_files) < 10:
         print("[Info] 소스 코드 수량이 부족하여 docs(예제) 디렉토리를 포함합니다.")
-        target_files = [f for f in raw_files if "node_modules" not in f and ".test." not in f]
+        target_files = [f for f in raw_files if "node_modules" not in str(f) and ".test." not in str(f)]
 
     print(f"[Info] 수집된 분석 대상 파일: {len(target_files)}개")
 
@@ -137,20 +142,21 @@ def run_pipeline():
 
     for filepath in target_files:
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with filepath.open("r", encoding="utf-8") as f:
                 code = f.read()
             
+            parser = get_parser_for_file(filepath)
             tree = parser.parse(bytes(code, "utf8"))
             
             # A. Baseline 처리
             base_chunks = chunk_baseline(code)
-            for c in base_chunks: c['filepath'] = os.path.basename(filepath)
+            for c in base_chunks: c['filepath'] = filepath.name
             dataset_baseline.extend(base_chunks)
             
             # B. Proposed 처리
             our_chunks = chunk_ours(tree, code)
             unique_ours = {v['id']: v for v in our_chunks}.values() # ID 기반 중복 제거
-            for c in unique_ours: c['filepath'] = os.path.basename(filepath)
+            for c in unique_ours: c['filepath'] = filepath.name
             dataset_ours.extend(unique_ours)
             
         except Exception as e:
@@ -158,14 +164,13 @@ def run_pipeline():
             pass
 
     # 결과 저장
-    output_dir = os.path.join(BASE_DIR, "dataset")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    output_dir = BASE_DIR / "dataset"
+    output_dir.mkdir(exist_ok=True)
 
-    with open(os.path.join(output_dir, "dataset_baseline.json"), "w", encoding="utf-8") as f:
+    with (output_dir / "dataset_baseline.json").open("w", encoding="utf-8") as f:
         json.dump(dataset_baseline, f, indent=2, ensure_ascii=False)
         
-    with open(os.path.join(output_dir, "dataset_ours.json"), "w", encoding="utf-8") as f:
+    with (output_dir / "dataset_ours.json").open("w", encoding="utf-8") as f:
         json.dump(list(dataset_ours), f, indent=2, ensure_ascii=False)
 
     print("\n[Success] 데이터셋 구축 완료.")

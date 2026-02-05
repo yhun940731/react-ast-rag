@@ -10,10 +10,9 @@ React/TypeScript 코드의 구조적 특징(Hook, JSX)을 인식하여 의미론
 - **`test_parser.py`**
   - **역할:** Tree-sitter 라이브러리 정상 동작 확인용 스크립트.
   - **기능:** `.tsx` 파일을 읽어 AST(추상 구문 트리) 구조를 출력.
-- **`vendor/` (디렉토리)**
-  - **역할:** TypeScript/TSX 문법 정의 파일(Grammar) 저장소. (필수 의존성)
-- **`build/` (디렉토리)**
-  - **역할:** Python용으로 컴파일된 언어 파서 라이브러리(`.so`) 저장소.
+- **의존성(필수)**
+  - **역할:** Python 바인딩(`tree-sitter`) + TypeScript/TSX 언어 패키지(`tree-sitter-typescript`).
+  - **설치:** `pip install -r requirements.txt`
 
 ### 2. 청킹 알고리즘 개발 단계 (Development)
 
@@ -34,7 +33,7 @@ React/TypeScript 코드의 구조적 특징(Hook, JSX)을 인식하여 의미론
 
 ### 4. 시각화 및 검증 (Viewer)
 
-- **`compare_viewer_academic.py`**
+- **`compare_viewer.py`**
   - **역할:** 논문 삽입용 비교 실험 결과(Figure) 생성 도구.
   - **특징:** 학술적 용어로 포맷팅된 한국어 출력 제공.
 
@@ -42,6 +41,30 @@ React/TypeScript 코드의 구조적 특징(Hook, JSX)을 인식하여 의미론
 
 ```bash
 # Mac OS 기준
+python3 -m venv venv
 source venv/bin/activate
-python compare_viewer_academic.py
+pip install -r requirements.txt
+
+# venv가 제대로 잡혔는지 빠르게 확인
+which python
+python -c "import sys; print(sys.executable)"
+
+python test_parser.py
+python data_pipeline.py
+python compare_viewer.py
+```
+
+## 🔎 (참고) 전역 Python이 여러 개 보이는 이유
+
+macOS에서는 보통 아래처럼 서로 다른 Python이 함께 존재합니다.
+
+- `/usr/bin/python3`: macOS 기본 제공(예: 3.9.x)
+- `/Library/Frameworks/Python.framework/...`: python.org 설치본(예: 3.14.x)
+- `/usr/local/bin/python3`: Homebrew 등으로 설치된 Python
+
+어떤 Python이 실행되는지 확인하려면:
+
+```bash
+which -a python3
+python3 -V
 ```
